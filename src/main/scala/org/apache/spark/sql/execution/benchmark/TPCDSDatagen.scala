@@ -26,11 +26,13 @@ import org.slf4j.LoggerFactory
 /**
  * This class was copied from `spark-sql-perf` and modified slightly.
  */
-class Tables(sqlContext: SQLContext, scaleFactor: Int) extends Serializable {
-  import sqlContext.implicits._
+class Tables(spark: SparkSession, scaleFactor: Int) extends Serializable {
+  import spark.sqlContext.implicits._
 
   private val logger = LoggerFactory.getLogger(classOf[Tables])
-  private def sparkContext = sqlContext.sparkContext
+
+  val tableAnalyzer: IcebergTableAnalyzer = IcebergTableAnalyzer(spark, "spark_catalog", "default")
+  private def sparkContext = spark.sqlContext.sparkContext
 
   private object Table {
 
@@ -83,7 +85,7 @@ class Tables(sqlContext: SQLContext, scaleFactor: Int) extends Serializable {
       }
 
       val stringData =
-        sqlContext.createDataFrame(
+        spark.createDataFrame(
           rows,
           StructType(schema.fields.map(f => StructField(f.name, StringType))))
 
@@ -127,21 +129,31 @@ class Tables(sqlContext: SQLContext, scaleFactor: Int) extends Serializable {
     }
 
     def genData(numPartitions: Int): Unit = {
-
       val data = df(numPartitions)
       val tempTableName = s"${name}_text"
       data.createOrReplaceTempView(tempTableName)
 
-      //column names to columns
-      val columns = partitionColumns.map(col => Column(col))
+      val commaSeparatedPartitionColumns = partitionColumns.mkString(",")
 
       if (partitionColumns.nonEmpty) {
-        data
-          .sortWithinPartitions(partitionColumns.head, partitionColumns.tail: _*)
-          .writeTo(this.name)
-          .tableProperty("write.distribution-mode", "range")
-          .partitionedBy(columns.head, columns.tail: _*)
-          .createOrReplace()
+        spark.sql(
+          s"""
+             |CREATE OR REPLACE TABLE $name
+             |PARTITIONED BY ($commaSeparatedPartitionColumns)
+             |AS SELECT * FROM $tempTableName LIMIT 0
+             |""".stripMargin)
+
+        spark.sql(
+          s"""
+             | ALTER TABLE $name WRITE DISTRIBUTED BY PARTITION
+             | LOCALLY ORDERED BY $commaSeparatedPartitionColumns
+             |""".stripMargin)
+
+        spark.sql(
+          s"""
+             |INSERT INTO $name
+             |SELECT * FROM $tempTableName order by $commaSeparatedPartitionColumns
+             |""".stripMargin)
       } else {
         // If the table is not partitioned, coalesce the data to a single file.
         data.coalesce(1)
@@ -149,7 +161,7 @@ class Tables(sqlContext: SQLContext, scaleFactor: Int) extends Serializable {
           .createOrReplace()
       }
 
-      sqlContext.dropTempTable(tempTableName)
+      spark.sqlContext.dropTempTable(tempTableName)
     }
   }
 
@@ -191,6 +203,8 @@ class Tables(sqlContext: SQLContext, scaleFactor: Int) extends Serializable {
       val endTime = System.currentTimeMillis()
       val duration = (endTime - startTime) / 1000.0
       logger.info(s"Finished generating data for ${table.name} in $duration seconds")
+
+      tableAnalyzer.analyze(table.name)
     }
   }
 
@@ -747,7 +761,7 @@ object TPCDSDatagen {
   def main(args: Array[String]): Unit = {
     val datagenArgs = new TPCDSDatagenArguments(args)
     val spark = SparkSession.builder.getOrCreate()
-    val tpcdsTables = new Tables(spark.sqlContext, datagenArgs.scaleFactor.toInt)
+    val tpcdsTables = new Tables(spark, datagenArgs.scaleFactor.toInt)
     tpcdsTables.genData(
       datagenArgs.partitionTables,
       datagenArgs.useDoubleForDecimal,
