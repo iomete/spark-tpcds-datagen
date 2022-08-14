@@ -18,45 +18,50 @@
 package org.apache.spark.sql.execution.benchmark
 
 import java.io.{File, FilenameFilter}
-
 import org.apache.spark.SparkFunSuite
-import org.apache.spark.sql.test.SharedSparkSession
+import org.apache.spark.sql.SparkSession
+import org.slf4j.LoggerFactory
 
-class TPCDSDatagenSuite extends SparkFunSuite with SharedSparkSession {
+class TPCDSDatagenSuite extends SparkFunSuite {
+
+  private val logger = LoggerFactory.getLogger(classOf[TPCDSDatagenSuite])
 
   test("datagen") {
     val outputTempDir = Utils.createTempDir()
+
+    val spark = SparkSession
+      .builder()
+      .appName("IntegrationTest")
+      .master("local")
+      .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+      .config("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkSessionCatalog")
+      .config("spark.sql.catalog.spark_catalog.type", "hadoop")
+      .config("spark.sql.catalog.spark_catalog.warehouse", outputTempDir.getAbsolutePath)
+      .config("spark.sql.catalog.default_iceberg", "org.apache.iceberg.spark.SparkCatalog")
+      .config("spark.sql.catalog.default_iceberg.type", "hadoop")
+      .config("spark.sql.catalog.default_iceberg.warehouse", outputTempDir.getAbsolutePath)
+      .config("spark.sql.legacy.createHiveTableByDefault", "false")
+      .config("spark.sql.sources.default", "iceberg")
+      .getOrCreate()
+
+    logger.info("outputTempDir: " + outputTempDir.getAbsolutePath)
+
     val tpcdsTables = new Tables(spark.sqlContext, 1)
     tpcdsTables.genData(
       location = outputTempDir.getAbsolutePath,
-      format = "parquet",
+      format = "iceberg",
       overwrite = false,
-      partitionTables = false,
+      partitionTables = true,
       useDoubleForDecimal = false,
       useStringForChar = false,
       clusterByPartitionColumns = false,
       filterOutNullPartitionValues = false,
-      tableFilter = Set.empty,
+      tableFilter = Set("call_center", "catalog_page"),
       numPartitions = 4)
 
     val tpcdsExpectedTables = Set(
-      "call_center", "catalog_page", "catalog_returns", "catalog_sales", "customer",
-      "customer_address", "customer_demographics", "date_dim", "household_demographics",
-      "income_band", "inventory", "item", "promotion", "reason", "ship_mode", "store",
-      "store_returns", "store_sales", "time_dim", "warehouse", "web_page", "web_returns",
-      "web_sales", "web_site")
+      "call_center", "catalog_page")
 
     assert(outputTempDir.list.toSet === tpcdsExpectedTables)
-
-    // Checks if output test data generated in each table
-    val filenameFilter = new FilenameFilter {
-      override def accept(dir: File, name: String): Boolean = name.endsWith(".parquet")
-    }
-    tpcdsExpectedTables.foreach { table =>
-      val f = new File(s"${outputTempDir.getAbsolutePath}/$table").listFiles(filenameFilter)
-      assert(f.size === 1)
-    }
   }
-
-  // TODO: Adds tests to check the schemas of generated tables
 }

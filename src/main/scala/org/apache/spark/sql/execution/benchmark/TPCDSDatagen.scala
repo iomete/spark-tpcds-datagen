@@ -18,10 +18,10 @@
 package org.apache.spark.sql.execution.benchmark
 
 import scala.sys.process._
-
-import org.apache.spark.sql.{Column, DataFrame, Row, SaveMode, SparkSession, SQLContext}
+import org.apache.spark.sql.{Column, DataFrame, Row, SQLContext, SaveMode, SparkSession}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
+import org.slf4j.LoggerFactory
 
 /**
  * This class was copied from `spark-sql-perf` and modified slightly.
@@ -29,6 +29,7 @@ import org.apache.spark.sql.types._
 class Tables(sqlContext: SQLContext, scaleFactor: Int) extends Serializable {
   import sqlContext.implicits._
 
+  private val logger = LoggerFactory.getLogger(classOf[Tables])
   private def sparkContext = sqlContext.sparkContext
 
   private object Table {
@@ -39,6 +40,8 @@ class Tables(sqlContext: SQLContext, scaleFactor: Int) extends Serializable {
   }
 
   private case class Table(name: String, partitionColumns: Seq[String], schema: StructType) {
+    private val logger = LoggerFactory.getLogger(classOf[Table])
+
     def nonPartitioned: Table = {
       Table(name, Nil, schema)
     }
@@ -57,7 +60,7 @@ class Tables(sqlContext: SQLContext, scaleFactor: Int) extends Serializable {
           val commands = Seq(
             "bash", "-c",
             s"cd ${datagen.dir} && ./${datagen.cmd} -table $name -filter Y " +
-              s"-scale $scaleFactor $parallel"
+              s"-scale $scaleFactor -quiet Y $parallel"
           )
           commands.lines
         }
@@ -182,28 +185,6 @@ class Tables(sqlContext: SQLContext, scaleFactor: Int) extends Serializable {
       writer.save(location)
       sqlContext.dropTempTable(tempTableName)
     }
-
-    def createExternalTable(
-        location: String, format: String, databaseName: String, overwrite: Boolean): Unit = {
-      val qualifiedTableName = databaseName + "." + name
-      val tableExists = sqlContext.tableNames(databaseName).contains(name)
-      if (overwrite) {
-        sqlContext.sql(s"DROP TABLE IF EXISTS $databaseName.$name")
-      }
-      if (!tableExists || overwrite) {
-        // In `3.0.0-preview2`, this method has been removed though,
-        // the community is planning to revert it back in the 3.0 official release.
-        // sqlContext.createExternalTable(qualifiedTableName, location, format)
-        sqlContext.sparkSession.catalog.createTable(qualifiedTableName, location, format)
-      }
-    }
-
-    def createTemporaryTable(location: String, format: String): Unit = {
-      // In `3.0.0-preview2`, this method has been removed though,
-      // the community is planning to revert it back in the 3.0 official release.
-      // sqlContext.read.format(format).load(location).registerTempTable(name)
-      sqlContext.read.format(format).load(location).createOrReplaceTempView(name)
-    }
   }
 
   def genData(
@@ -230,6 +211,8 @@ class Tables(sqlContext: SQLContext, scaleFactor: Int) extends Serializable {
       }
     }
 
+    logger.info("Tables to be generated: " + tablesToBeGenerated.map(_.name).mkString(", "))
+
     val withSpecifiedDataType = {
       var tables = tablesToBeGenerated
       if (useDoubleForDecimal) tables = tables.map(_.useDoubleForDecimal())
@@ -239,8 +222,17 @@ class Tables(sqlContext: SQLContext, scaleFactor: Int) extends Serializable {
 
     withSpecifiedDataType.foreach { table =>
       val tableLocation = s"$location/${table.name}"
+
+      val startTime = System.currentTimeMillis()
+
+      logger.info(s"Starting to generate data for ${table.name}")
+
       table.genData(tableLocation, format, overwrite, clusterByPartitionColumns,
         filterOutNullPartitionValues, numPartitions)
+
+      val endTime = System.currentTimeMillis()
+      val duration = (endTime - startTime) / 1000.0
+      logger.info(s"Finished generating data for ${table.name} in $duration seconds")
     }
   }
 
