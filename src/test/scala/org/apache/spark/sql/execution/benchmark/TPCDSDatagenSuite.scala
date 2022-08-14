@@ -18,7 +18,6 @@
 package org.apache.spark.sql.execution.benchmark
 
 import org.apache.spark.SparkFunSuite
-import org.apache.spark.sql.SparkSession
 import org.slf4j.LoggerFactory
 
 class TPCDSDatagenSuite extends SparkFunSuite {
@@ -36,7 +35,7 @@ class TPCDSDatagenSuite extends SparkFunSuite {
     tpcdsTables.genData(
       partitionTables = true,
       useDoubleForDecimal = false,
-      useStringForChar = false,
+      useStringForChar = true,
       tableFilter = Set("call_center", "inventory"),
       numPartitions = 4)
   }

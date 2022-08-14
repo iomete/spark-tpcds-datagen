@@ -23,9 +23,9 @@ import scala.util.Try
 
 class TPCDSDatagenArguments(val args: Array[String]) {
   var scaleFactor = "1"
-  var partitionTables = false
+  var partitionTables = true
   var useDoubleForDecimal = false
-  var useStringForChar = false
+  var useStringForChar = true
   var tableFilter: Set[String] = Set.empty
   var numPartitions = "100"
 
