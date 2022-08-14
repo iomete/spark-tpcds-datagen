@@ -24,7 +24,7 @@ import scala.util.Try
 class TPCDSDatagenArguments(val args: Array[String]) {
   var outputLocation: String = null
   var scaleFactor = "1"
-  var format = "parquet"
+  var format = "iceberg"
   var overwrite = false
   var partitionTables = false
   var useDoubleForDecimal = false

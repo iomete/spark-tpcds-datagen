@@ -29,20 +29,7 @@ class TPCDSDatagenSuite extends SparkFunSuite {
   test("datagen") {
     val outputTempDir = Utils.createTempDir()
 
-    val spark = SparkSession
-      .builder()
-      .appName("IntegrationTest")
-      .master("local")
-      .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-      .config("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkSessionCatalog")
-      .config("spark.sql.catalog.spark_catalog.type", "hadoop")
-      .config("spark.sql.catalog.spark_catalog.warehouse", outputTempDir.getAbsolutePath)
-      .config("spark.sql.catalog.default_iceberg", "org.apache.iceberg.spark.SparkCatalog")
-      .config("spark.sql.catalog.default_iceberg.type", "hadoop")
-      .config("spark.sql.catalog.default_iceberg.warehouse", outputTempDir.getAbsolutePath)
-      .config("spark.sql.legacy.createHiveTableByDefault", "false")
-      .config("spark.sql.sources.default", "iceberg")
-      .getOrCreate()
+    val spark = TestUtil.hadoopSparkSession("TPCDSDatagenSuite", outputTempDir.getAbsolutePath)
 
     logger.info("outputTempDir: " + outputTempDir.getAbsolutePath)
 
