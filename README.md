@@ -33,15 +33,10 @@ If you run TPCDS quries on the master branch of Spark, you say a sequence of com
     $ ./bin/dsdgen --help
     Usage: spark-submit --class <this class> --conf key=value <spark tpcds datagen jar> [Options]
     Options:
-      --output-location [STR]                Path to an output location
       --scale-factor [NUM]                   Scale factor (default: 1)
-      --format [STR]                         Output format (default: parquet)
-      --overwrite                            Whether it overwrites existing data (default: false)
       --partition-tables                     Whether it partitions output data (default: false)
       --use-double-for-decimal               Whether it prefers double types instead of decimal types (default: false)
       --use-string-for-char                  Whether it prefers string types instead of char/varchar types (default: false)
-      --cluster-by-partition-columns         Whether it cluster output data by partition columns (default: false)
-      --filter-out-null-partition-values     Whether it filters out NULL partitions (default: false)
       --table-filter [STR]                   Queries to filter, e.g., catalog_sales,store_sales
       --num-partitions [NUM]                 # of partitions (default: 100)
 

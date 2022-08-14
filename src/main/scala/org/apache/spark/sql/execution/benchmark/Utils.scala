@@ -30,7 +30,7 @@ private[benchmark] object Utils {
    * Create a directory inside the given parent directory. The directory is guaranteed to be
    * newly created, and is not marked for automatic deletion.
    */
-  private def createDirectory(root: String, namePrefix: String = "spark"): File = {
+  def createDirectory(root: String, namePrefix: String = "spark"): File = {
     var attempts = 0
     val maxAttempts = 10
     var dir: File = null

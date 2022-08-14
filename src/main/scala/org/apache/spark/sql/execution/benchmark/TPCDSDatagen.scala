@@ -50,7 +50,7 @@ class Tables(sqlContext: SQLContext, scaleFactor: Int) extends Serializable {
      *  If convertToSchema is true, the data from generator will be parsed into columns and
      *  converted to `schema`. Otherwise, it just outputs the raw data (as a single STRING column).
      */
-    def df(convertToSchema: Boolean, numPartition: Int): DataFrame = {
+    def df(numPartition: Int): DataFrame = {
       val partitions = if (partitionColumns.isEmpty) 1 else numPartition
       val generatedData = {
         sparkContext.parallelize(1 to partitions, partitions).flatMap { i =>
@@ -70,44 +70,36 @@ class Tables(sqlContext: SQLContext, scaleFactor: Int) extends Serializable {
 
       val rows = generatedData.mapPartitions { iter =>
         iter.map { l =>
-          if (convertToSchema) {
-            val values = l.split("\\|", -1).dropRight(1).map { v =>
-              if (v.equals("")) {
-                // If the string value is an empty string, we turn it to a null
-                null
-              } else {
-                v
-              }
+          val values = l.split("\\|", -1).dropRight(1).map { v =>
+            if (v.equals("")) {
+              // If the string value is an empty string, we turn it to a null
+              null
+            } else {
+              v
             }
-            Row.fromSeq(values)
-          } else {
-            Row.fromSeq(Seq(l))
           }
+          Row.fromSeq(values)
         }
       }
 
-      if (convertToSchema) {
-        val stringData =
-          sqlContext.createDataFrame(
-            rows,
-            StructType(schema.fields.map(f => StructField(f.name, StringType))))
+      val stringData =
+        sqlContext.createDataFrame(
+          rows,
+          StructType(schema.fields.map(f => StructField(f.name, StringType))))
 
-        val convertedData = {
-          val columns = schema.fields.map { f =>
-            val expr = f.dataType match {
-              // TODO: In branch-3.1, we need right-side padding for char types
-              case CharType(n) => rpad(Column(f.name), n, " ")
-              case _ => Column(f.name).cast(f.dataType)
-            }
-            expr.as(f.name)
+      val convertedData = {
+        val columns = schema.fields.map { f =>
+          val expr = f.dataType match {
+            // TODO: In branch-3.1, we need right-side padding for char types
+            case CharType(n) => rpad(Column(f.name), n, " ")
+            case _ => Column(f.name).cast(f.dataType)
           }
-          stringData.select(columns: _*)
+          expr.as(f.name)
         }
-
-        convertedData
-      } else {
-        sqlContext.createDataFrame(rows, StructType(Seq(StructField("value", StringType))))
+        stringData.select(columns: _*)
       }
+
+      convertedData
     }
 
     def useDoubleForDecimal(): Table = {
@@ -134,68 +126,37 @@ class Tables(sqlContext: SQLContext, scaleFactor: Int) extends Serializable {
       Table(name, partitionColumns, StructType(newFields))
     }
 
-    def genData(
-        location: String,
-        format: String,
-        overwrite: Boolean,
-        clusterByPartitionColumns: Boolean,
-        filterOutNullPartitionValues: Boolean,
-        numPartitions: Int): Unit = {
-      val mode = if (overwrite) SaveMode.Overwrite else SaveMode.Ignore
+    def genData(numPartitions: Int): Unit = {
 
-      val data = df(format != "text", numPartitions)
+      val data = df(numPartitions)
       val tempTableName = s"${name}_text"
       data.createOrReplaceTempView(tempTableName)
 
-      val writer = if (partitionColumns.nonEmpty) {
-        if (clusterByPartitionColumns) {
-          val columnString = data.schema.fields.map { field =>
-            field.name
-          }.mkString(",")
-          val partitionColumnString = partitionColumns.mkString(",")
-          val predicates = if (filterOutNullPartitionValues) {
-            partitionColumns.map(col => s"$col IS NOT NULL").mkString("WHERE ", " AND ", "")
-          } else {
-            ""
-          }
+      //column names to columns
+      val columns = partitionColumns.map(col => Column(col))
 
-          val query =
-            s"""
-              |SELECT
-              |  $columnString
-              |FROM
-              |  $tempTableName
-              |$predicates
-              |DISTRIBUTE BY
-              |  $partitionColumnString
-            """.stripMargin
-          val grouped = sqlContext.sql(query)
-          grouped.write
-        } else {
-          data.write
-        }
+      if (partitionColumns.nonEmpty) {
+        data
+          .sortWithinPartitions(partitionColumns.head, partitionColumns.tail: _*)
+          .writeTo(this.name)
+          .tableProperty("write.distribution-mode", "range")
+          .partitionedBy(columns.head, columns.tail: _*)
+          .createOrReplace()
       } else {
         // If the table is not partitioned, coalesce the data to a single file.
-        data.coalesce(1).write
+        data.coalesce(1)
+          .writeTo(this.name)
+          .createOrReplace()
       }
-      writer.format(format).mode(mode)
-      if (partitionColumns.nonEmpty) {
-        writer.partitionBy(partitionColumns : _*)
-      }
-      writer.save(location)
+
       sqlContext.dropTempTable(tempTableName)
     }
   }
 
   def genData(
-      location: String,
-      format: String,
-      overwrite: Boolean,
       partitionTables: Boolean,
       useDoubleForDecimal: Boolean,
       useStringForChar: Boolean,
-      clusterByPartitionColumns: Boolean,
-      filterOutNullPartitionValues: Boolean,
       tableFilter: Set[String] = Set.empty,
       numPartitions: Int = 100): Unit = {
     var tablesToBeGenerated = if (partitionTables) {
@@ -221,14 +182,11 @@ class Tables(sqlContext: SQLContext, scaleFactor: Int) extends Serializable {
     }
 
     withSpecifiedDataType.foreach { table =>
-      val tableLocation = s"$location/${table.name}"
-
       val startTime = System.currentTimeMillis()
 
       logger.info(s"Starting to generate data for ${table.name}")
 
-      table.genData(tableLocation, format, overwrite, clusterByPartitionColumns,
-        filterOutNullPartitionValues, numPartitions)
+      table.genData(numPartitions)
 
       val endTime = System.currentTimeMillis()
       val duration = (endTime - startTime) / 1000.0
@@ -791,14 +749,9 @@ object TPCDSDatagen {
     val spark = SparkSession.builder.getOrCreate()
     val tpcdsTables = new Tables(spark.sqlContext, datagenArgs.scaleFactor.toInt)
     tpcdsTables.genData(
-      datagenArgs.outputLocation,
-      datagenArgs.format,
-      datagenArgs.overwrite,
       datagenArgs.partitionTables,
       datagenArgs.useDoubleForDecimal,
       datagenArgs.useStringForChar,
-      datagenArgs.clusterByPartitionColumns,
-      datagenArgs.filterOutNullPartitionValues,
       datagenArgs.tableFilter,
       datagenArgs.numPartitions.toInt)
     spark.stop()

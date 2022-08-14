@@ -92,3 +92,4 @@ spark-warehouse/
 # For additional settings
 bin/spark-master
 
+/lakehouse/

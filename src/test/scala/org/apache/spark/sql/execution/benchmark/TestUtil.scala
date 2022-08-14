@@ -2,6 +2,8 @@ package org.apache.spark.sql.execution.benchmark
 
 import org.apache.spark.sql.SparkSession
 
+import java.io.File
+
 object TestUtil {
 
   def hadoopSparkSession(appName: String, warehouseLocation: String): SparkSession = {
@@ -19,6 +21,35 @@ object TestUtil {
       .config("spark.sql.legacy.createHiveTableByDefault", "false")
       .config("spark.sql.sources.default", "iceberg")
       .getOrCreate()
+  }
+
+
+  def regenerateDirectory(dir: String): File = {
+    deleteDirectories(dir)
+
+    val file = new File(dir)
+    if (file.exists()) {
+      file.delete()
+    }
+    file.mkdirs()
+    file
+  }
+
+  private def deleteDirectories(parentDir: String): Unit = {
+    val dir = new java.io.File(parentDir)
+    if (dir.exists() && dir.isDirectory) {
+      val children = dir.listFiles()
+      if (children != null) {
+        for (child <- children) {
+          if (child.isDirectory) {
+            deleteDirectories(child.getAbsolutePath)
+          } else {
+            child.delete()
+          }
+        }
+      }
+    }
+    dir.delete()
   }
 
 }

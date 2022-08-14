@@ -22,15 +22,10 @@ import java.util.Locale
 import scala.util.Try
 
 class TPCDSDatagenArguments(val args: Array[String]) {
-  var outputLocation: String = null
   var scaleFactor = "1"
-  var format = "iceberg"
-  var overwrite = false
   var partitionTables = false
   var useDoubleForDecimal = false
   var useStringForChar = false
-  var clusterByPartitionColumns = false
-  var filterOutNullPartitionValues = false
   var tableFilter: Set[String] = Set.empty
   var numPartitions = "100"
 
@@ -42,21 +37,10 @@ class TPCDSDatagenArguments(val args: Array[String]) {
 
     while(args.nonEmpty) {
       args match {
-        case ("--output-location") :: value :: tail =>
-          outputLocation = value
-          args = tail
-
         case ("--scale-factor") :: value :: tail =>
           scaleFactor = value
           args = tail
 
-        case ("--format") :: value :: tail =>
-          format = value
-          args = tail
-
-        case ("--overwrite") :: tail =>
-          overwrite = true
-          args = tail
 
         case ("--partition-tables") :: tail =>
           partitionTables = true
@@ -68,14 +52,6 @@ class TPCDSDatagenArguments(val args: Array[String]) {
 
         case ("--use-string-for-char") :: tail =>
           useStringForChar = true
-          args = tail
-
-        case ("--cluster-by-partition-columns") :: tail =>
-          clusterByPartitionColumns = true
-          args = tail
-
-        case ("--filter-out-null-partition-values") :: tail =>
-          filterOutNullPartitionValues = true
           args = tail
 
         case ("--table-filter") :: value :: tail =>
@@ -103,7 +79,6 @@ class TPCDSDatagenArguments(val args: Array[String]) {
     System.err.println("""
       |Usage: spark-submit --class <this class> --conf key=value <spark tpcds datagen jar> [Options]
       |Options:
-      |  --output-location [STR]                Path to an output location
       |  --scale-factor [NUM]                   Scale factor (default: 1)
       |  --format [STR]                         Output format (default: parquet)
       |  --overwrite                            Whether it overwrites existing data (default: false)
@@ -121,12 +96,6 @@ class TPCDSDatagenArguments(val args: Array[String]) {
   }
 
   private def validateArguments(): Unit = {
-    if (outputLocation == null) {
-      // scalastyle:off println
-      System.err.println("Must specify an output location")
-      // scalastyle:on println
-      printUsageAndExit(-1)
-    }
     if (Try(scaleFactor.toInt).getOrElse(-1) <= 0) {
       // scalastyle:off println
       System.err.println("Scale factor must be a positive number")
