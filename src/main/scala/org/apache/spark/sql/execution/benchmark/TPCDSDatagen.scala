@@ -42,7 +42,6 @@ class Tables(spark: SparkSession, scaleFactor: Int) extends Serializable {
   }
 
   private case class Table(name: String, partitionColumns: Seq[String], schema: StructType) {
-    private val logger = LoggerFactory.getLogger(classOf[Table])
 
     def nonPartitioned: Table = {
       Table(name, Nil, schema)

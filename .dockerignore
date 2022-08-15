@@ -1,0 +1,8 @@
+/.git
+/.envrc
+/.readme.md
+/.idea/
+/build/
+/src/
+/spark-warehouse/
+/lakehouse
