@@ -27,7 +27,7 @@ class TPCDSDatagenRemoteSuite extends SparkFunSuite {
   test("datagen_remote") {
     val spark = TestUtil.remoteSparkSession("TPCDSDatagenSuite")
 
-//    spark.sql("show databases").show()
+    // spark.sql("show databases").show()
 
     val tpcdsTables = new Tables(spark, 1)
     tpcdsTables.genData(

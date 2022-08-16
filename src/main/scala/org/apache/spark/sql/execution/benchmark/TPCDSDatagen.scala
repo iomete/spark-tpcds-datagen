@@ -63,7 +63,7 @@ class Tables(spark: SparkSession, scaleFactor: Int) extends Serializable {
             s"cd ${datagen.dir} && ./${datagen.cmd} -table $name -filter Y " +
               s"-scale $scaleFactor -quiet Y $parallel"
           )
-          commands.lines
+          commands.lineStream
         }
       }
 
