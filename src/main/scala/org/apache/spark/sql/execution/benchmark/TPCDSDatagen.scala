@@ -127,7 +127,7 @@ class Tables(spark: SparkSession, scaleFactor: Int) extends Serializable {
       Table(name, partitionColumns, StructType(newFields))
     }
 
-    def genData(numPartitions: Int): Unit = {
+    def genData(database: String, numPartitions: Int): Unit = {
       val data = df(numPartitions)
       val tempTableName = s"${name}_text"
       data.createOrReplaceTempView(tempTableName)
@@ -137,26 +137,26 @@ class Tables(spark: SparkSession, scaleFactor: Int) extends Serializable {
       if (partitionColumns.nonEmpty) {
         spark.sql(
           s"""
-             |CREATE OR REPLACE TABLE $name
+             |CREATE OR REPLACE TABLE $database.$name
              |PARTITIONED BY ($commaSeparatedPartitionColumns)
              |AS SELECT * FROM $tempTableName LIMIT 0
              |""".stripMargin)
 
         spark.sql(
           s"""
-             | ALTER TABLE $name WRITE DISTRIBUTED BY PARTITION
+             | ALTER TABLE $database.$name WRITE DISTRIBUTED BY PARTITION
              | LOCALLY ORDERED BY $commaSeparatedPartitionColumns
              |""".stripMargin)
 
         spark.sql(
           s"""
-             |INSERT INTO $name
+             |INSERT INTO $database.$name
              |SELECT * FROM $tempTableName order by $commaSeparatedPartitionColumns
              |""".stripMargin)
       } else {
         // If the table is not partitioned, coalesce the data to a single file.
         data.coalesce(1)
-          .writeTo(this.name)
+          .writeTo(s"$database.${this.name}")
           .createOrReplace()
       }
 
@@ -164,22 +164,17 @@ class Tables(spark: SparkSession, scaleFactor: Int) extends Serializable {
     }
   }
 
-  def genData(
-      partitionTables: Boolean,
-      useDoubleForDecimal: Boolean,
-      useStringForChar: Boolean,
-      tableFilter: Set[String] = Set.empty,
-      numPartitions: Int = 100): Unit = {
-    var tablesToBeGenerated = if (partitionTables) {
+  def genData(applicationConfig: ApplicationConfig): Unit = {
+    var tablesToBeGenerated = if (applicationConfig.partitionTables) {
       tables
     } else {
       tables.map(_.nonPartitioned)
     }
 
-    if (tableFilter.nonEmpty) {
-      tablesToBeGenerated = tablesToBeGenerated.filter { case t => tableFilter.contains(t.name) }
+    if (applicationConfig.tableFilter.nonEmpty) {
+      tablesToBeGenerated = tablesToBeGenerated.filter { case t => applicationConfig.tableFilter.contains(t.name) }
       if (tablesToBeGenerated.isEmpty) {
-        throw new RuntimeException("Bad table name filter: " + tableFilter)
+        throw new RuntimeException("Bad table name filter: " + applicationConfig.tableFilter)
       }
     }
 
@@ -187,8 +182,8 @@ class Tables(spark: SparkSession, scaleFactor: Int) extends Serializable {
 
     val withSpecifiedDataType = {
       var tables = tablesToBeGenerated
-      if (useDoubleForDecimal) tables = tables.map(_.useDoubleForDecimal())
-      if (useStringForChar) tables = tables.map(_.useStringForChar())
+      if (applicationConfig.useDoubleForDecimal) tables = tables.map(_.useDoubleForDecimal())
+      if (applicationConfig.useStringForChar) tables = tables.map(_.useStringForChar())
       tables
     }
 
@@ -197,7 +192,7 @@ class Tables(spark: SparkSession, scaleFactor: Int) extends Serializable {
 
       logger.info(s"Starting to generate data for ${table.name}")
 
-      table.genData(numPartitions)
+      table.genData(applicationConfig.database, applicationConfig.numPartitions)
 
       val endTime = System.currentTimeMillis()
       val duration = (endTime - startTime) / 1000.0
@@ -758,15 +753,17 @@ class Tables(spark: SparkSession, scaleFactor: Int) extends Serializable {
 object TPCDSDatagen {
 
   def main(args: Array[String]): Unit = {
-    val datagenArgs = new TPCDSDatagenArguments(args)
+    // val datagenArgs = new TPCDSDatagenArguments(args)
+
+    val configLocation = "/etc/configs/application.conf"
+    val applicationConfig = Utils.loadConfigFromFile(configLocation)
+    println(applicationConfig)
+
     val spark = SparkSession.builder.getOrCreate()
-    val tpcdsTables = new Tables(spark, datagenArgs.scaleFactor.toInt)
-    tpcdsTables.genData(
-      datagenArgs.partitionTables,
-      datagenArgs.useDoubleForDecimal,
-      datagenArgs.useStringForChar,
-      datagenArgs.tableFilter,
-      datagenArgs.numPartitions.toInt)
+
+    val tpcdsTables = new Tables(spark, applicationConfig.scaleFactor)
+    tpcdsTables.genData(applicationConfig)
+
     spark.stop()
   }
 }

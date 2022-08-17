@@ -31,12 +31,12 @@ class TPCDSDatagenSuite extends SparkFunSuite {
 
     logger.info("outputTempDir: " + lakehouseDir.getAbsolutePath)
 
-    val tpcdsTables = new Tables(spark, 1)
-    tpcdsTables.genData(
-      partitionTables = true,
-      useDoubleForDecimal = false,
-      useStringForChar = true,
-      tableFilter = Set("call_center", "inventory"),
-      numPartitions = 4)
+    val configLocation = "application.conf"
+    val applicationConfig = Utils.loadConfigFromResources(configLocation)
+
+    logger.info(applicationConfig.toString)
+
+    val tpcdsTables = new Tables(spark, applicationConfig.scaleFactor)
+    tpcdsTables.genData(applicationConfig)
   }
 }

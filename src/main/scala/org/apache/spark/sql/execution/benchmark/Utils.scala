@@ -19,10 +19,10 @@ package org.apache.spark.sql.execution.benchmark
 
 import java.io.{ByteArrayOutputStream, File, FileInputStream, IOException, PrintWriter}
 import java.util.UUID
-
 import org.apache.commons.lang3.StringUtils
-
 import org.apache.spark.sql.DataFrame
+import pureconfig.{ConfigReader, ConfigSource}
+import pureconfig.generic.auto._
 
 private[benchmark] object Utils {
 
@@ -45,7 +45,9 @@ private[benchmark] object Utils {
         if (dir.exists() || !dir.mkdirs()) {
           dir = null
         }
-      } catch { case e: SecurityException => dir = null; }
+      } catch {
+        case e: SecurityException => dir = null;
+      }
     }
 
     dir.getCanonicalFile
@@ -56,8 +58,8 @@ private[benchmark] object Utils {
    * automatically deleted when the VM shuts down.
    */
   def createTempDir(
-      root: String = System.getProperty("java.io.tmpdir"),
-      namePrefix: String = "spark"): File = {
+                     root: String = System.getProperty("java.io.tmpdir"),
+                     namePrefix: String = "spark"): File = {
     val dir = createDirectory(root, namePrefix)
     dir.deleteOnExit()
     dir
@@ -87,7 +89,7 @@ private[benchmark] object Utils {
     val outStream = new ByteArrayOutputStream
     try {
       var reading = true
-      while ( reading ) {
+      while (reading) {
         inStream.read() match {
           case -1 => reading = false
           case c => outStream.write(c)
@@ -113,10 +115,10 @@ private[benchmark] object Utils {
   }
 
   def formatOutput(
-      df: DataFrame,
-      _numRows: Int,
-      truncate: Int = 20,
-      vertical: Boolean = false): String = {
+                    df: DataFrame,
+                    _numRows: Int,
+                    truncate: Int = 20,
+                    vertical: Boolean = false): String = {
     val numRows = _numRows.max(0)
     val takeResult = df.take(numRows + 1)
     val hasMoreData = takeResult.length > numRows
@@ -225,5 +227,13 @@ private[benchmark] object Utils {
     }
 
     sb.toString
+  }
+
+  def loadConfigFromFile(location: String): ApplicationConfig = {
+    ConfigSource.file(location).load[ApplicationConfig].toOption.get
+  }
+
+  def loadConfigFromResources(location: String): ApplicationConfig = {
+    ConfigSource.resources(location).load[ApplicationConfig].toOption.get
   }
 }

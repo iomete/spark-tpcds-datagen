@@ -29,12 +29,12 @@ class TPCDSDatagenRemoteSuite extends SparkFunSuite {
 
     // spark.sql("show databases").show()
 
-    val tpcdsTables = new Tables(spark, 1)
-    tpcdsTables.genData(
-      partitionTables = true,
-      useDoubleForDecimal = false,
-      useStringForChar = true,
-      tableFilter = Set("call_center"),
-      numPartitions = 4)
+    val configLocation = "application.conf"
+    val applicationConfig = Utils.loadConfigFromResources(configLocation)
+
+    logger.info(applicationConfig.toString)
+
+    val tpcdsTables = new Tables(spark, applicationConfig.scaleFactor)
+    tpcdsTables.genData(applicationConfig)
   }
 }
