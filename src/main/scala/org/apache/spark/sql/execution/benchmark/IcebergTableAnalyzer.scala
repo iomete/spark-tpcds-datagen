@@ -3,19 +3,19 @@ package org.apache.spark.sql.execution.benchmark
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
-case class IcebergTableAnalyzer(spark: SparkSession, catalog: String, database: String) {
+case class IcebergTableAnalyzer(spark: SparkSession, catalog: String) {
   private val logger = LoggerFactory.getLogger(classOf[IcebergTableAnalyzer])
 
-  def analyze(tableName: String, verbose: Boolean = false): Unit = {
+  def analyze(database: String, tableName: String, verbose: Boolean = false): Unit = {
 
-    generalStatistics(tableName, verbose)
+    generalStatistics(database, tableName, verbose)
 
-    val isPartitioned = isPartitionedTable(tableName)
+    val isPartitioned = isPartitionedTable(database, tableName)
 
     val unoptimizedFiles = if (isPartitioned) {
-      unoptimizedFilesForPartitionedTable(tableName)
+      unoptimizedFilesForPartitionedTable(database, tableName)
     } else {
-      unoptimizedFilesForNonPartitionedTable(tableName)
+      unoptimizedFilesForNonPartitionedTable(database, tableName)
     }
 
     if (unoptimizedFiles.count() > 0) {
@@ -24,7 +24,7 @@ case class IcebergTableAnalyzer(spark: SparkSession, catalog: String, database: 
     }
   }
 
-  private def generalStatistics(tableName: String, verbose: Boolean = false): Unit = {
+  private def generalStatistics(database: String, tableName: String, verbose: Boolean = false): Unit = {
     if (verbose) {
       spark.sql(s"SELECT * FROM $catalog.$database.$tableName.files").show()
     }
@@ -38,7 +38,7 @@ case class IcebergTableAnalyzer(spark: SparkSession, catalog: String, database: 
          |    FROM $catalog.$database.$tableName.files""".stripMargin).show()
   }
 
-  private def unoptimizedFilesForNonPartitionedTable(tableName: String): DataFrame = {
+  private def unoptimizedFilesForNonPartitionedTable(database: String, tableName: String): DataFrame = {
     spark.sql(
       s"""
          |with tbl_summary (
@@ -58,7 +58,7 @@ case class IcebergTableAnalyzer(spark: SparkSession, catalog: String, database: 
          |""".stripMargin)
   }
 
-  private def unoptimizedFilesForPartitionedTable(tableName: String): DataFrame = {
+  private def unoptimizedFilesForPartitionedTable(database: String, tableName: String): DataFrame = {
     spark.sql(
       s"""
          |with tbl_summary (
@@ -81,7 +81,7 @@ case class IcebergTableAnalyzer(spark: SparkSession, catalog: String, database: 
 
   }
 
-  private def isPartitionedTable(tableName: String): Boolean = {
+  private def isPartitionedTable(database: String, tableName: String): Boolean = {
     spark.table(s"$catalog.$database.$tableName.partitions")
       .schema.fieldNames.contains("partition")
   }

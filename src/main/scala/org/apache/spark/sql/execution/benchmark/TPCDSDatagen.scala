@@ -31,7 +31,7 @@ class Tables(spark: SparkSession, scaleFactor: Int) extends Serializable {
 
   private val logger = LoggerFactory.getLogger(classOf[Tables])
 
-  val tableAnalyzer: IcebergTableAnalyzer = IcebergTableAnalyzer(spark, "spark_catalog", "default")
+  val tableAnalyzer: IcebergTableAnalyzer = IcebergTableAnalyzer(spark, "spark_catalog")
   private def sparkContext = spark.sqlContext.sparkContext
 
   private object Table {
@@ -198,7 +198,7 @@ class Tables(spark: SparkSession, scaleFactor: Int) extends Serializable {
       val duration = (endTime - startTime) / 1000.0
       logger.info(s"Finished generating data for ${table.name} in $duration seconds")
 
-      tableAnalyzer.analyze(table.name)
+      tableAnalyzer.analyze(applicationConfig.database, table.name)
     }
   }
 
