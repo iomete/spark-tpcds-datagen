@@ -25,16 +25,16 @@ class TPCDSDatagenRemoteSuite extends SparkFunSuite {
   private val logger = LoggerFactory.getLogger(classOf[TPCDSDatagenRemoteSuite])
 
   test("datagen_remote") {
-    val spark = TestUtil.remoteSparkSession("TPCDSDatagenSuite")
-
-    // spark.sql("show databases").show()
-
-    val configLocation = "application.conf"
-    val applicationConfig = Utils.loadConfigFromResources(configLocation)
-
-    logger.info(applicationConfig.toString)
-
-    val tpcdsTables = new Tables(spark, applicationConfig.scaleFactor)
-    tpcdsTables.genData(applicationConfig)
+    //    val spark = TestUtil.remoteSparkSession("TPCDSDatagenSuite")
+    //
+    //    // spark.sql("show databases").show()
+    //
+    //    val configLocation = "application.conf"
+    //    val applicationConfig = Utils.loadConfigFromResources(configLocation)
+    //
+    //    logger.info(applicationConfig.toString)
+    //
+    //    val tpcdsTables = new Tables(spark, applicationConfig.scaleFactor)
+    //    tpcdsTables.genData(applicationConfig)
   }
 }
