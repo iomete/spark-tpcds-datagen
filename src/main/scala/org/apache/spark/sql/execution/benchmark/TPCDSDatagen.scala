@@ -31,7 +31,7 @@ class Tables(spark: SparkSession, scaleFactor: Int) extends Serializable {
 
   private val logger = LoggerFactory.getLogger(classOf[Tables])
 
-  val tableAnalyzer: IcebergTableAnalyzer = IcebergTableAnalyzer(spark, "spark_catalog")
+  val tableAnalyzer: IcebergTableAnalyzer = IcebergTableAnalyzer(spark)
   private def sparkContext = spark.sqlContext.sparkContext
 
   private object Table {

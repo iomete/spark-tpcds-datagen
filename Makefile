@@ -1,5 +1,8 @@
 docker_image := iomete/tpcds-iceberg-generator
-docker_tag := 0.3.0
+docker_tag := 1.0.0
+
+build:
+	mvn clean package
 
 docker-push:
 	# Run this for one time: docker buildx create --use
