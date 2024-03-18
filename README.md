@@ -7,6 +7,65 @@ is daily tracked in the Google Spreadsheet ([performance charts](https://docs.go
 
 Note that the current `master` branch intends to support [3.1.1](https://downloads.apache.org/spark/spark-3.1.1) on Scala 2.12.x. If you want to generate TPCDS data in Spark 3.0.x, please use [branch-3.0](https://github.com/maropu/spark-tpcds-datagen/tree/branch-3.0).
 
+## How to generate TPCDS data in IOMETE
+
+- Docker image: `iomete/tpcds-iceberg-generator:1.0.0`
+- Main application file: `iomete/tpcds-iceberg-generator:1.0.0`
+- Main class: `org.apache.spark.sql.execution.benchmark.TPCDSDatagen`
+
+[![Spark Job Deployment](doc/images/spark-job-deployment.png)](doc/images/spark-job-deployment.png)
+
+Configuration file: `/etc/configs/application.conf`
+```hocon
+{
+    scale-factor = 1,
+    partition-tables = true,
+    use-double-for-decimal = false,
+    use-string-for-char = true,
+    num-partitions = 4,
+    table-filter = [],
+    database = "local_minio.tpcds_1g"
+}
+```
+
+[![TPCDS Configuration](doc/images/tpcds-config.png)](doc/images/tpcds-config.png)
+
+Explanation of the configuration parameters:
+- `scale-factor`: The scale factor of the dataset to generate. Example: 1 means 1GB, 100 means 100GB, 1000 means 1TB, 10000 means 10TB.
+- `partition-tables`: Whether it partitions output data (default: false)
+- `use-double-for-decimal`: Whether it prefers double types instead of decimal types (default: false)
+- `use-string-for-char`: Whether it prefers string types instead of char/varchar types (default: false)
+- `num-partitions`: # of partitions (default: 100)
+- `table-filter`: Queries to filter, e.g., catalog_sales,store_sales. The default value is an empty list, which means all tables will be generated.
+
+Below are the list of all tables:
+- catalog_returns
+- inventory
+- catalog_sales
+- store_returns
+- store_sales
+- web_returns
+- web_sales
+- call_center
+- catalog_page
+- household_demographics
+- customer
+- customer_address
+- customer_demographics
+- date_dim
+- income_band
+- item
+- promotion
+- reason
+- ship_mode
+- store
+- time_dim
+- warehouse
+- web_page
+- web_site
+
+
+
 ## How to generate TPCDS data
 
 You can generate TPCDS data in `/tmp/spark-tpcds-data`:
