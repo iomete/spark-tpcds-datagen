@@ -1,11 +1,8 @@
-docker_image := iomete/tpcds_iceberg_generator
-docker_tag := 0.2.1
+docker_image := iomete/tpcds-iceberg-generator
+docker_tag := 1.0.0
 
-docker-build:
-	# Run this for one time: docker buildx create --use
-	docker build -f Dockerfile -t ${docker_image}:${docker_tag} .
-	@echo ${docker_image}
-	@echo ${docker_tag}
+build:
+	mvn clean package
 
 docker-push:
 	# Run this for one time: docker buildx create --use

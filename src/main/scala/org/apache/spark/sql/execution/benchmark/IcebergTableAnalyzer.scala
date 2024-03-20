@@ -3,7 +3,7 @@ package org.apache.spark.sql.execution.benchmark
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
-case class IcebergTableAnalyzer(spark: SparkSession, catalog: String) {
+case class IcebergTableAnalyzer(spark: SparkSession) {
   private val logger = LoggerFactory.getLogger(classOf[IcebergTableAnalyzer])
 
   def analyze(database: String, tableName: String, verbose: Boolean = false): Unit = {
@@ -25,8 +25,9 @@ case class IcebergTableAnalyzer(spark: SparkSession, catalog: String) {
   }
 
   private def generalStatistics(database: String, tableName: String, verbose: Boolean = false): Unit = {
+    val namespace = getFullyQualifiedDatabaseName(database)
     if (verbose) {
-      spark.sql(s"SELECT * FROM $catalog.$database.$tableName.files").show()
+      spark.sql(s"SELECT * FROM $namespace.$tableName.files").show()
     }
 
     logger.info(s"Summary for table: $tableName")
@@ -35,10 +36,12 @@ case class IcebergTableAnalyzer(spark: SparkSession, catalog: String) {
          |    SUM(record_count) total_records,
          |    round(sum(file_size_in_bytes)/1000000, 2) as size_in_MB,
          |    round(sum(file_size_in_bytes)/1000000000, 2) size_in_GB
-         |    FROM $catalog.$database.$tableName.files""".stripMargin).show()
+         |    FROM $namespace.$tableName.files""".stripMargin).show()
   }
 
   private def unoptimizedFilesForNonPartitionedTable(database: String, tableName: String): DataFrame = {
+    val namespace = getFullyQualifiedDatabaseName(database)
+
     spark.sql(
       s"""
          |with tbl_summary (
@@ -47,7 +50,7 @@ case class IcebergTableAnalyzer(spark: SparkSession, catalog: String) {
          |        SUM(record_count) total_records,
          |        round(sum(file_size_in_bytes)/1000000, 2) as size_in_MB,
          |        round(sum(file_size_in_bytes)/1000000000, 2) size_in_GB
-         |    FROM $catalog.$database.$tableName.files
+         |    FROM $namespace.$tableName.files
          |    WHERE file_size_in_bytes <= 400000000 or file_size_in_bytes > 600000000
          |)
          |SELECT
@@ -59,6 +62,8 @@ case class IcebergTableAnalyzer(spark: SparkSession, catalog: String) {
   }
 
   private def unoptimizedFilesForPartitionedTable(database: String, tableName: String): DataFrame = {
+    val namespace = getFullyQualifiedDatabaseName(database)
+
     spark.sql(
       s"""
          |with tbl_summary (
@@ -68,7 +73,7 @@ case class IcebergTableAnalyzer(spark: SparkSession, catalog: String) {
          |        SUM(record_count) total_records,
          |        round(sum(file_size_in_bytes)/1000000, 2) as size_in_MB,
          |        round(sum(file_size_in_bytes)/1000000000, 2) size_in_GB
-         |    FROM $catalog.$database.$tableName.files
+         |    FROM $namespace.$tableName.files
          |    WHERE file_size_in_bytes <= 400000000 or file_size_in_bytes > 600000000
          |    GROUP BY partition
          |)
@@ -82,7 +87,20 @@ case class IcebergTableAnalyzer(spark: SparkSession, catalog: String) {
   }
 
   private def isPartitionedTable(database: String, tableName: String): Boolean = {
-    spark.table(s"$catalog.$database.$tableName.partitions")
+    val namespace = getFullyQualifiedDatabaseName(database)
+
+    spark.table(s"$namespace.$tableName.partitions")
       .schema.fieldNames.contains("partition")
   }
+
+  private def getFullyQualifiedDatabaseName(databaseName: String): String = {
+    if (databaseName.contains(".")) {
+      // If the database name already contains a catalog name, return it as is
+      databaseName
+    } else {
+      // If not, prepend "spark_catalog" as the catalog name
+      s"spark_catalog.$databaseName"
+    }
+  }
+
 }
