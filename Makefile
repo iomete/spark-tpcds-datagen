@@ -1,5 +1,5 @@
 docker_image := iomete/tpcds-iceberg-generator
-docker_tag := 1.1.0
+docker_tag := 1.2.0
 
 build:
 	mvn clean package
