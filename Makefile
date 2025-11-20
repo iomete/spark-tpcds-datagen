@@ -1,8 +1,8 @@
-docker_image := iomete/tpcds-iceberg-generator
-docker_tag := 1.0.0
+docker_image := iomete.azurecr.io/iomete/tpcds-iceberg-generator
+docker_tag := 3.5.5
 
 build:
-	mvn clean package
+	./build/mvn clean package
 
 docker-push:
 	# Run this for one time: docker buildx create --use
