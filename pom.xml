@@ -35,7 +35,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <java.version>11</java.version>
     <maven.version>3.6.3</maven.version>
-    <scala.version>2.12.8</scala.version>
+    <scala.version>2.12.21</scala.version>
     <scala.binary.version>2.12</scala.binary.version>
     <spark.version>3.5.7</spark.version>
     <iceberg.version>1.4.2</iceberg.version>
